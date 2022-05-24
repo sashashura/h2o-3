@@ -61,7 +61,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
                  plug_values=None,  # type: Optional[Union[None, str, H2OFrame]]
                  compute_p_values=False,  # type: bool
                  remove_collinear_columns=False,  # type: bool
-                 intercept=False,  # type: bool
+                 intercept=True,  # type: bool
                  non_negative=False,  # type: bool
                  max_iterations=0,  # type: int
                  objective_epsilon=-1.0,  # type: float
@@ -86,7 +86,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
                  nparallelism=0,  # type: int
                  max_predictor_number=1,  # type: int
                  min_predictor_number=1,  # type: int
-                 mode="maxr",  # type: Literal["allsubsets", "maxr", "backward"]
+                 mode="maxr",  # type: Literal["allsubsets", "maxr", "maxrsweep", "backward"]
                  p_values_threshold=0.0,  # type: float
                  ):
         """
@@ -202,7 +202,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
                Defaults to ``False``.
         :type remove_collinear_columns: bool
         :param intercept: Include constant term in the model
-               Defaults to ``False``.
+               Defaults to ``True``.
         :type intercept: bool
         :param non_negative: Restrict coefficients (not intercept) to be non-negative
                Defaults to ``False``.
@@ -306,7 +306,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
         :param mode: Mode: Used to choose model selection algorithms to use.  Options include 'allsubsets' for all
                subsets, 'maxr' for MaxR, 'backward' for backward selection
                Defaults to ``"maxr"``.
-        :type mode: Literal["allsubsets", "maxr", "backward"]
+        :type mode: Literal["allsubsets", "maxr", "maxrsweep", "backward"]
         :param p_values_threshold: For mode='backward' only.  If specified, will stop the model building process when
                all coefficientsp-values drop below this threshold
                Defaults to ``0.0``.
@@ -796,7 +796,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
         """
         Include constant term in the model
 
-        Type: ``bool``, defaults to ``False``.
+        Type: ``bool``, defaults to ``True``.
         """
         return self._parms.get("intercept")
 
@@ -1166,13 +1166,13 @@ class H2OModelSelectionEstimator(H2OEstimator):
         Mode: Used to choose model selection algorithms to use.  Options include 'allsubsets' for all subsets, 'maxr'
         for MaxR, 'backward' for backward selection
 
-        Type: ``Literal["allsubsets", "maxr", "backward"]``, defaults to ``"maxr"``.
+        Type: ``Literal["allsubsets", "maxr", "maxrsweep", "backward"]``, defaults to ``"maxr"``.
         """
         return self._parms.get("mode")
 
     @mode.setter
     def mode(self, mode):
-        assert_is_type(mode, None, Enum("allsubsets", "maxr", "backward"))
+        assert_is_type(mode, None, Enum("allsubsets", "maxr", "maxrsweep", "backward"))
         self._parms["mode"] = mode
 
     @property

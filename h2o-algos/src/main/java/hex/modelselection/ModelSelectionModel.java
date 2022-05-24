@@ -60,6 +60,7 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
         public double[] _alpha;
         public double[] _lambda;
         public boolean _standardize = true;
+        public boolean _intercept = true;
         GLMModel.GLMParameters.Family _family = AUTO;
         public boolean _lambda_search;
         public GLMModel.GLMParameters.Link _link = GLMModel.GLMParameters.Link.family_default;
@@ -85,7 +86,8 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
         
         public enum Mode {
             allsubsets, // use combinatorial, exponential runtime
-            maxr, // use sequential replacement
+            maxr, // use sequential replacement but calls GLM to build all models
+            maxrsweep, // use sequential replacement but use sweep to generate GLM coefficients
             backward // use backward selection
         }
         @Override

@@ -64,7 +64,7 @@
 #' @param compute_p_values \code{Logical}. Request p-values computation, p-values work only with IRLSM solver and no regularization
 #'        Defaults to FALSE.
 #' @param remove_collinear_columns \code{Logical}. In case of linearly dependent columns, remove some of the dependent columns Defaults to FALSE.
-#' @param intercept \code{Logical}. Include constant term in the model Defaults to FALSE.
+#' @param intercept \code{Logical}. Include constant term in the model Defaults to TRUE.
 #' @param non_negative \code{Logical}. Restrict coefficients (not intercept) to be non-negative Defaults to FALSE.
 #' @param max_iterations Maximum number of iterations Defaults to 0.
 #' @param objective_epsilon Converge if  objective value changes less than this. Default (of -1.0) indicates: If lambda_search is set to
@@ -115,8 +115,8 @@
 #' @param min_predictor_number For mode = 'backward' only.  Minimum number of predictors to be considered when building GLM models starting
 #'        with all predictors to be included.  Defaults to 1. Defaults to 1.
 #' @param mode Mode: Used to choose model selection algorithms to use.  Options include 'allsubsets' for all subsets, 'maxr'
-#'        for MaxR, 'backward' for backward selection Must be one of: "allsubsets", "maxr", "backward". Defaults to
-#'        maxr.
+#'        for MaxR, 'backward' for backward selection Must be one of: "allsubsets", "maxr", "maxrsweep", "backward".
+#'        Defaults to maxr.
 #' @param p_values_threshold For mode='backward' only.  If specified, will stop the model building process when all coefficientsp-values
 #'        drop below this threshold  Defaults to 0.
 #' @examples
@@ -160,7 +160,7 @@ h2o.modelSelection <- function(x,
                                plug_values = NULL,
                                compute_p_values = FALSE,
                                remove_collinear_columns = FALSE,
-                               intercept = FALSE,
+                               intercept = TRUE,
                                non_negative = FALSE,
                                max_iterations = 0,
                                objective_epsilon = -1,
@@ -184,7 +184,7 @@ h2o.modelSelection <- function(x,
                                nparallelism = 0,
                                max_predictor_number = 1,
                                min_predictor_number = 1,
-                               mode = c("allsubsets", "maxr", "backward"),
+                               mode = c("allsubsets", "maxr", "maxrsweep", "backward"),
                                p_values_threshold = 0)
 {
   # Validate required training_frame first and other frame args: should be a valid key or an H2OFrame object
@@ -348,7 +348,7 @@ h2o.modelSelection <- function(x,
                                                plug_values = NULL,
                                                compute_p_values = FALSE,
                                                remove_collinear_columns = FALSE,
-                                               intercept = FALSE,
+                                               intercept = TRUE,
                                                non_negative = FALSE,
                                                max_iterations = 0,
                                                objective_epsilon = -1,
@@ -372,7 +372,7 @@ h2o.modelSelection <- function(x,
                                                nparallelism = 0,
                                                max_predictor_number = 1,
                                                min_predictor_number = 1,
-                                               mode = c("allsubsets", "maxr", "backward"),
+                                               mode = c("allsubsets", "maxr", "maxrsweep", "backward"),
                                                p_values_threshold = 0,
                                                segment_columns = NULL,
                                                segment_models_id = NULL,
