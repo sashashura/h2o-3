@@ -106,9 +106,13 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                  generate_scoring_history=False,  # type: bool
                  auc_type="auto",  # type: Literal["auto", "none", "macro_ovr", "weighted_ovr", "macro_ovo", "weighted_ovo"]
                  dispersion_epsilon=0.0001,  # type: float
-                 max_iterations_dispersion=1000000,  # type: int
+                 tweedie_epsilon=8e-27,  # type: float
+                 max_iterations_dispersion=3000,  # type: int
                  build_null_model=False,  # type: bool
                  fix_dispersion_parameter=False,  # type: bool
+                 fix_tweedie_variance_power=True,  # type: bool
+                 logll_length=8,  # type: int
+                 dispersion_learning_rate=0.5,  # type: float
                  ):
         """
         :param model_id: Destination id for this model; auto-generated if not specified.
@@ -370,9 +374,13 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                will break out of the dispersion parameter estimation loop using maximum likelihood
                Defaults to ``0.0001``.
         :type dispersion_epsilon: float
+        :param tweedie_epsilon: In estimating tweedie dispersion parameter using maximum likelihood, this is used to
+               choose the lower and upper indices in the approximating of the infinite series summation.
+               Defaults to ``8e-27``.
+        :type tweedie_epsilon: float
         :param max_iterations_dispersion: control the maximum number of iterations in the dispersion parameter
                estimation loop using maximum likelihood
-               Defaults to ``1000000``.
+               Defaults to ``3000``.
         :type max_iterations_dispersion: int
         :param build_null_model: If set, will build a model with only the intercept.  Default to false.
                Defaults to ``False``.
@@ -382,6 +390,25 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                p-values. Default to false.
                Defaults to ``False``.
         :type fix_dispersion_parameter: bool
+        :param fix_tweedie_variance_power: If true, will fix tweedie variance power value to the value set in
+               tweedie_variance_power
+               Defaults to ``True``.
+        :type fix_tweedie_variance_power: bool
+        :param logll_length: only valid for dispersion_parameter_model = ml, family = tweedie,
+               fix_dispersion_parameter=false, fix_tweedie_variance_power=true and tweedie_variance_power>2.  During the
+               process to find the best dispersion, the loglikelihood value will go up and down and are saved into a
+               list.  This parameter controls the length of the array before we stop the process.  In general, the
+               longer the list, the better dispersion value we will get.  However, this will increase the run time.
+               Default to 8.
+               Defaults to ``8``.
+        :type logll_length: int
+        :param dispersion_learning_rate: Dispersion learning rate is only valid for tweedie family dispersion parameter
+               estimation using ml. It must be > 0.  This controls how much the dispersion parameter estimate is to be
+               changed when the calculated loglikelihood actually decreases with the new dispersion.  In this casek,
+               instead of settingnew dispersion = dispersion - change, we set new dispersion = dispersion +
+               dispersion_learning_rate*change. Defaults to 0.5.
+               Defaults to ``0.5``.
+        :type dispersion_learning_rate: float
         """
         super(H2OGeneralizedLinearEstimator, self).__init__()
         self._parms = {}
@@ -454,9 +481,13 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self.generate_scoring_history = generate_scoring_history
         self.auc_type = auc_type
         self.dispersion_epsilon = dispersion_epsilon
+        self.tweedie_epsilon = tweedie_epsilon
         self.max_iterations_dispersion = max_iterations_dispersion
         self.build_null_model = build_null_model
         self.fix_dispersion_parameter = fix_dispersion_parameter
+        self.fix_tweedie_variance_power = fix_tweedie_variance_power
+        self.logll_length = logll_length
+        self.dispersion_learning_rate = dispersion_learning_rate
 
     @property
     def training_frame(self):
@@ -2215,11 +2246,26 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self._parms["dispersion_epsilon"] = dispersion_epsilon
 
     @property
+    def tweedie_epsilon(self):
+        """
+        In estimating tweedie dispersion parameter using maximum likelihood, this is used to choose the lower and upper
+        indices in the approximating of the infinite series summation.
+
+        Type: ``float``, defaults to ``8e-27``.
+        """
+        return self._parms.get("tweedie_epsilon")
+
+    @tweedie_epsilon.setter
+    def tweedie_epsilon(self, tweedie_epsilon):
+        assert_is_type(tweedie_epsilon, None, numeric)
+        self._parms["tweedie_epsilon"] = tweedie_epsilon
+
+    @property
     def max_iterations_dispersion(self):
         """
         control the maximum number of iterations in the dispersion parameter estimation loop using maximum likelihood
 
-        Type: ``int``, defaults to ``1000000``.
+        Type: ``int``, defaults to ``3000``.
         """
         return self._parms.get("max_iterations_dispersion")
 
@@ -2256,6 +2302,55 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
     def fix_dispersion_parameter(self, fix_dispersion_parameter):
         assert_is_type(fix_dispersion_parameter, None, bool)
         self._parms["fix_dispersion_parameter"] = fix_dispersion_parameter
+
+    @property
+    def fix_tweedie_variance_power(self):
+        """
+        If true, will fix tweedie variance power value to the value set in tweedie_variance_power
+
+        Type: ``bool``, defaults to ``True``.
+        """
+        return self._parms.get("fix_tweedie_variance_power")
+
+    @fix_tweedie_variance_power.setter
+    def fix_tweedie_variance_power(self, fix_tweedie_variance_power):
+        assert_is_type(fix_tweedie_variance_power, None, bool)
+        self._parms["fix_tweedie_variance_power"] = fix_tweedie_variance_power
+
+    @property
+    def logll_length(self):
+        """
+        only valid for dispersion_parameter_model = ml, family = tweedie, fix_dispersion_parameter=false,
+        fix_tweedie_variance_power=true and tweedie_variance_power>2.  During the process to find the best dispersion,
+        the loglikelihood value will go up and down and are saved into a list.  This parameter controls the length of
+        the array before we stop the process.  In general, the longer the list, the better dispersion value we will get.
+        However, this will increase the run time.  Default to 8.
+
+        Type: ``int``, defaults to ``8``.
+        """
+        return self._parms.get("logll_length")
+
+    @logll_length.setter
+    def logll_length(self, logll_length):
+        assert_is_type(logll_length, None, int)
+        self._parms["logll_length"] = logll_length
+
+    @property
+    def dispersion_learning_rate(self):
+        """
+        Dispersion learning rate is only valid for tweedie family dispersion parameter estimation using ml. It must be >
+        0.  This controls how much the dispersion parameter estimate is to be changed when the calculated loglikelihood
+        actually decreases with the new dispersion.  In this casek, instead of settingnew dispersion = dispersion -
+        change, we set new dispersion = dispersion + dispersion_learning_rate*change. Defaults to 0.5.
+
+        Type: ``float``, defaults to ``0.5``.
+        """
+        return self._parms.get("dispersion_learning_rate")
+
+    @dispersion_learning_rate.setter
+    def dispersion_learning_rate(self, dispersion_learning_rate):
+        assert_is_type(dispersion_learning_rate, None, numeric)
+        self._parms["dispersion_learning_rate"] = dispersion_learning_rate
 
     Lambda = deprecated_property('Lambda', lambda_)
 

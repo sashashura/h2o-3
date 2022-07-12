@@ -87,13 +87,25 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
             "generate_scoring_history",
             "auc_type",
             "dispersion_epsilon",
+            "tweedie_epsilon",
             "max_iterations_dispersion",
             "build_null_model",
-            "fix_dispersion_parameter"
+            "fix_dispersion_parameter",
+            "fix_tweedie_variance_power",
+            "logll_length",
+            "dispersion_learning_rate"
     };
 
     @API(help = "Seed for pseudo random number generator (if applicable)", gridable = true)
     public long seed;
+    
+    @API(help = "only valid for dispersion_parameter_model = ml, family = tweedie, fix_dispersion_parameter=false, " +
+            "fix_tweedie_variance_power=true and tweedie_variance_power>2.  During the process to find the best" +
+            " dispersion, the loglikelihood value will go up and down and are saved into a list.  This parameter" +
+            " controls the length of the array before we stop the process.  In general, the longer the list, the " +
+            "better dispersion value we will get.  However, this will increase the run time.  Default to 8.", 
+            gridable = true )
+    public int logll_length;
 
     // Input fields
     @API(help = "Family. Use binomial for classification with logistic regression, others are for regression problems.",
@@ -108,6 +120,13 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
 
     @API(help = "Tweedie variance power", level = Level.critical, gridable = true)
     public double tweedie_variance_power;
+
+    @API(help = "Dispersion learning rate is only valid for tweedie family dispersion parameter estimation using ml. " +
+            "It must be > 0.  This controls how much the dispersion parameter estimate is to be changed when the" +
+            " calculated loglikelihood actually decreases with the new dispersion.  In this casek, instead of setting" +
+            "new dispersion = dispersion - change, we set new dispersion = dispersion + dispersion_learning_rate*change. " +
+            "Defaults to 0.5.", level = Level.expert, gridable = true)
+    public double dispersion_learning_rate;
 
     @API(help = "Tweedie link power", level = Level.critical, gridable = true)
     public double tweedie_link_power;
@@ -272,11 +291,20 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
     @API(help="Request p-values computation, p-values work only with IRLSM solver and no regularization", level = Level.secondary, direction = Direction.INPUT)
     public boolean compute_p_values; // _remove_collinear_columns
 
+    @API(help="If true, will fix tweedie variance power value to the value set in tweedie_variance_power",
+            level=Level.secondary, direction=Direction.INPUT)
+    public boolean fix_tweedie_variance_power;
+
     @API(help="In case of linearly dependent columns, remove some of the dependent columns", level = Level.secondary, direction = Direction.INPUT)
     public boolean remove_collinear_columns; // _remove_collinear_columns
 
     @API(help = "if changes in dispersion parameter estimation is smaller than dispersion_epsilon, will break out of the dispersion parameter estimation loop using maximum likelihood", level = API.Level.secondary, direction = API.Direction.INOUT)
     public double dispersion_epsilon;
+
+    @API(help = "In estimating tweedie dispersion parameter using maximum likelihood, this is used to choose the lower" +
+            " and upper indices in the approximating of the infinite series summation.", 
+            level = API.Level.secondary, direction = API.Direction.INOUT)
+    public double tweedie_epsilon;
     
     @API(help = "control the maximum number of iterations in the dispersion parameter estimation loop using maximum likelihood", level = API.Level.secondary, direction = API.Direction.INOUT)
     public int max_iterations_dispersion;
