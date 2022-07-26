@@ -85,7 +85,8 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
         public enum Mode {
             allsubsets, // use combinatorial, exponential runtime
             maxr, // use sequential replacement but calls GLM to build all models
-            maxrsweep, // use sequential replacement but use sweep to generate GLM coefficients
+            maxrsweep, // use with big array
+            maxrsweep2, // use sequential replacement but use sweep to generate GLM coefficients
             backward // use backward selection
         }
         @Override
