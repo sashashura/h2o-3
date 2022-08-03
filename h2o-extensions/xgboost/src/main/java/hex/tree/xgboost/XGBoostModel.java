@@ -13,7 +13,6 @@ import hex.genmodel.algos.xgboost.XGBoostMojoModel;
 import hex.genmodel.utils.DistributionFamily;
 import hex.tree.FriedmanPopescusH;
 import hex.tree.PlattScalingHelper;
-import hex.tree.SharedTreeModel;
 import hex.tree.xgboost.predict.*;
 import hex.tree.xgboost.util.PredictConfiguration;
 import hex.util.EffectiveParametersUtils;
@@ -946,8 +945,7 @@ public class XGBoostModel extends Model<XGBoostModel, XGBoostModel.XGBoostParame
   }
   @Override
   public double getFriedmanPopescusH(Frame frame, String[] vars) {
-    Frame adaptFrm = new Frame(frame);
-    adaptTestForTrain(adaptFrm, true, false);
+    Frame adaptFrm = makeCompatibleWithTrainingFrame(frame);
 
     for(int colId = 0; colId < adaptFrm.numCols(); colId++) {
       Vec col = adaptFrm.vec(colId);
