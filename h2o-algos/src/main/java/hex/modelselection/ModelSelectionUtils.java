@@ -10,13 +10,13 @@ import jsr166y.RecursiveAction;
 import water.DKV;
 import water.Key;
 import water.fvec.Frame;
-import water.util.Log;
 
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
+
+import static hex.gam.MatrixFrameUtils.GamUtils.copy2DArray;
 import static hex.glm.GLMModel.GLMParameters.Family.gaussian;
 
 public class ModelSelectionUtils {
@@ -102,8 +102,7 @@ public class ModelSelectionUtils {
             predBitSet.set(predIndex);
     }
     
-    public static int[][] mapPredIndex2CPMIndices(DataInfo dinfo, ModelSelectionModel.ModelSelectionParameters parms, 
-                                                  int predLength) {
+    public static int[][] mapPredIndex2CPMIndices(DataInfo dinfo, int predLength) {
         int numPreds = predLength;
         int[][] pred2CPMMapping = new int[numPreds][];
         int offset = 0;
@@ -197,6 +196,8 @@ public class ModelSelectionUtils {
      * validSubsets to pick a predictor, generate the CPM and perform sweeping to generate an error variances.
      * 
      * The list of error variances will be returned.  See section V.I of doc.
+     * 
+     * for maxrsweep2
      */
     public static double[] generateAllErrorVariances(final double[][] allCPM, final SweepVector[][] sweepVec, double[][] prevCPM,
                                                      String[] predictorNames, List<Integer> currSubsetIndices,
@@ -260,6 +261,50 @@ public class ModelSelectionUtils {
                         sweepCPM(subsetCPM, IntStream.range(0, lastSubsetIndex).toArray(), false);
                        // copy over the CPM after sweeping and sweeping vector to main program
                         subsetMSE[resCount] = subsetCPM[lastSubsetIndex][lastSubsetIndex];
+                    }
+                };
+            }
+        }
+        ForkJoinTask.invokeAll(Arrays.stream(resA).filter(Objects::nonNull).toArray(RecursiveAction[]::new));
+        return subsetMSE;
+    }
+
+    // for maxrsweep
+    public static double[] generateAllErrorVariances(final double[][] origCPM, String[] predictorNames,
+                                                     List<Integer> currSubsetIndices, List<Integer> validSubsets,
+                                                     Set<BitSet> usedCombo, List<Integer[]> allSubsetList, 
+                                                     int[][] predInd2CPMInd, final int predPos) {
+        int[] allPreds = new int[currSubsetIndices.size() + 1];   // store the bigger predictor subset
+        if (currSubsetIndices.size() > 0) {  // copy over predictors to larger array
+            int[] temp = currSubsetIndices.stream().mapToInt(Integer::intValue).toArray();
+            if (predPos != 0)
+                System.arraycopy(temp, 0, allPreds, 0, predPos);
+            if (temp.length > predPos)
+                System.arraycopy(temp, predPos, allPreds, predPos+1, currSubsetIndices.size()-predPos);
+        }
+        BitSet tempIndices = new BitSet(predictorNames.length);
+        int maxModelCount = validSubsets.size();
+        RecursiveAction[] resA = new RecursiveAction[maxModelCount];
+        final int cpmLen = origCPM.length;
+        final int lastCPMIndex = cpmLen-1;
+        final double[] subsetMSE = Arrays.stream(new double[maxModelCount]).map(x -> Double.MAX_VALUE).toArray();
+        int modelCount = 0;
+        for (int predIndex : validSubsets) {  // consider valid predictor indices only
+            allPreds[predPos] = predIndex;
+            tempIndices.clear();
+            setBitSet(tempIndices, allPreds);
+            if (usedCombo.add((BitSet) tempIndices.clone())) {  // returns true if subset is not a duplicate
+                allSubsetList.add(IntStream.of(allPreds).boxed().toArray(Integer[]::new));
+                final int resCount = modelCount++;
+                final int[] subsetIndices = allPreds.clone();
+                resA[resCount] = new RecursiveAction() {
+                    @Override
+                    protected void compute() {
+                        int changedPredInd = subsetIndices[predPos];
+                        double[][] currCPM = new double[cpmLen][cpmLen];
+                        copy2DArray(origCPM, currCPM);
+                        sweepCPM(currCPM, predInd2CPMInd[changedPredInd], false);
+                        subsetMSE[resCount] = currCPM[lastCPMIndex][lastCPMIndex];
                     }
                 };
             }
@@ -610,6 +655,13 @@ public class ModelSelectionUtils {
         int bestIndex = IntStream.range(0, currModels.length)
                 .reduce((i,j) ->currModels[i]._errorVariance <= currModels[j]._errorVariance? i : j).getAsInt();
         double currMinMSE = currModels[bestIndex]._errorVariance;
+        return currMinMSE < lastMinMSE ? bestIndex : -1;
+    }
+
+    public static int findBestMSEModelIndex(double lastMinMSE, double[] modelMSEs) {
+        int bestIndex = IntStream.range(0, modelMSEs.length)
+                .reduce((i,j) ->modelMSEs[i] <= modelMSEs[j] ? i : j).getAsInt();
+        double currMinMSE = modelMSEs[bestIndex];
         return currMinMSE < lastMinMSE ? bestIndex : -1;
     }
     

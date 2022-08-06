@@ -620,7 +620,7 @@ public class ModelSelectionMaxRSweep2Tests extends TestUtil {
                 mPred2CPMMap[numInd+dinfo._cats] = new int[]{numOffset[numInd]};
 
             // generated from model
-            int[][] predictorIndex2CPMIndices = mapPredIndex2CPMIndices(dinfo, parms, predictorNames.length-1);
+            int[][] predictorIndex2CPMIndices = mapPredIndex2CPMIndices(dinfo, predictorNames.length-1);
 
             // compare manually generated and program generated predInd2MapIndices
             assertTrue(mPred2CPMMap.length==predictorIndex2CPMIndices.length);
