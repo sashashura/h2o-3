@@ -86,7 +86,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
                  nparallelism=0,  # type: int
                  max_predictor_number=1,  # type: int
                  min_predictor_number=1,  # type: int
-                 mode="maxr",  # type: Literal["allsubsets", "maxr", "maxrsweep", "backward"]
+                 mode="maxr",  # type: Literal["allsubsets", "maxr", "maxrsweep", "maxrsweep2", "backward"]
                  p_values_threshold=0.0,  # type: float
                  ):
         """
@@ -307,7 +307,7 @@ class H2OModelSelectionEstimator(H2OEstimator):
                subsets, 'maxr' for MaxR calling GLM to build all models, 'maxrsweep' for using sweep in MaxR, 'backward'
                for backward selection
                Defaults to ``"maxr"``.
-        :type mode: Literal["allsubsets", "maxr", "maxrsweep", "backward"]
+        :type mode: Literal["allsubsets", "maxr", "maxrsweep", "maxrsweep2", "backward"]
         :param p_values_threshold: For mode='backward' only.  If specified, will stop the model building process when
                all coefficientsp-values drop below this threshold
                Defaults to ``0.0``.
@@ -1167,13 +1167,13 @@ class H2OModelSelectionEstimator(H2OEstimator):
         Mode: Used to choose model selection algorithms to use.  Options include 'allsubsets' for all subsets, 'maxr'
         for MaxR calling GLM to build all models, 'maxrsweep' for using sweep in MaxR, 'backward' for backward selection
 
-        Type: ``Literal["allsubsets", "maxr", "maxrsweep", "backward"]``, defaults to ``"maxr"``.
+        Type: ``Literal["allsubsets", "maxr", "maxrsweep", "maxrsweep2", "backward"]``, defaults to ``"maxr"``.
         """
         return self._parms.get("mode")
 
     @mode.setter
     def mode(self, mode):
-        assert_is_type(mode, None, Enum("allsubsets", "maxr", "maxrsweep", "backward"))
+        assert_is_type(mode, None, Enum("allsubsets", "maxr", "maxrsweep", "maxrsweep2", "backward"))
         self._parms["mode"] = mode
 
     @property
