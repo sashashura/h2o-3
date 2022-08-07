@@ -260,6 +260,8 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                 Set<BitSet> usedCombos = new HashSet<>();
                 currSubsetIndices = forwardStep(currSubsetIndices, coefNames, validSubset, usedCombos, crossProdcutMatrix,
                         _predictorIndex2CPMIndices, currSubsetIndices.size());
+                sweepCPM(crossProdcutMatrix, _predictorIndex2CPMIndices[currSubsetIndices.get(currSubsetIndices.size()-1)],
+                        false);
                 validSubset.removeAll(currSubsetIndices);
                 _job.update(predNum, "Finished forward step with "+predNum+" predictors.");
 
@@ -605,7 +607,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                     Arrays.stream(subsetErrVar).min().getAsDouble());
             currSubsetIndices.clear();
             Arrays.stream(predSubsetList.get(bestInd)).map(x -> currSubsetIndices.add(x)).collect(Collectors.toList());
-            sweepCPM(currCPM, predInd2CPMInd[currSubsetIndices.get(predPos)], false);
+           // sweepCPM(currCPM, predInd2CPMInd[currSubsetIndices.get(predPos)], false);
             return currSubsetIndices;
         } else {
             return null;
@@ -701,11 +703,11 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                         subsetMSEs[index] = currCPM[lastCPMIndex][lastCPMIndex];
                         validSubset.add(removedSubInd);
                         allPredSubsets.add(currPredSubsets);
-                        if (subsetMSEs[index] < minMSE) {
+                        if (subsetMSEs[index] < minMSE) {   // apply sweep from forward if found lower MSE
+                            sweepCPM(currCPM, predInd2CPMInd[currPredSubsets.get(index)], false);
                             currSubsetIndices = new ArrayList<>(currPredSubsets);
                             minMSE = subsetMSEs[index];
                         } else {    // undo the sweep by the chosen new predictor
-                            sweepCPM(currCPM, predInd2CPMInd[currPredSubsets.get(index)], false);
                             sweepCPM(currCPM, predInd2CPMInd[removedSubInd], false);
                         }
                     }
