@@ -19,6 +19,7 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static hex.gam.MatrixFrameUtils.GamUtils.copy2DArray;
 import static hex.genmodel.utils.MathUtils.combinatorial;
 import static hex.glm.GLMModel.GLMParameters.Family.*;
 import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.*;
@@ -244,7 +245,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
             checkMemoryFootPrint(_dinfo);
             _coefNames = _dinfo.coefNames();
             List<Integer> currSubsetIndices = new ArrayList<>();    // store best k predictor subsets for 1 to k predictors
-            List<Integer> currSubsetIndicesRep = new ArrayList<>();
+            List<Integer> currSubsetIndicesRep;
             List<String> coefNames = new ArrayList<>(Arrays.asList(_predictorNames));
             // store predictor indices that are still available to be added to the bigger subset
             List<Integer> validSubset = IntStream.rangeClosed(0, coefNames.size() - 1).boxed().collect(Collectors.toList());
@@ -263,12 +264,10 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                 _job.update(predNum, "Finished forward step with "+predNum+" predictors.");
 
                 if (predNum < _numPredictors && predNum > 1) {  // implement the replacement part
-                    currSubsetIndicesRep = replacement(currSubsetIndices, coefNames, validSubset, usedCombos,
+                    currSubsetIndices = replacement(currSubsetIndices, coefNames, validSubset, usedCombos,
                             crossProdcutMatrix, _predictorIndex2CPMIndices);
                     validSubset = IntStream.rangeClosed(0, coefNames.size() - 1).boxed().collect(Collectors.toList());
-                    validSubset.removeAll(currSubsetIndicesRep);
-                    // sweep cpm according to currentSubsetIndices from replacement
-
+                    validSubset.removeAll(currSubsetIndices);
                 }
                 // build glm model with best subcarrier subsets for size and record the update
                 GLMModel bestR2Model = buildGLMModel(currSubsetIndices);
@@ -684,8 +683,8 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
         int[] msePredPosIndex = new int[currSubsetSize];
         double[] subsetMSEs = new double[currSubsetSize];
         List<List<Integer>> allPredSubsets = new ArrayList<>();
-        List<Integer> currPredSubsets = new ArrayList<>();
-
+        List<Integer> currPredSubsets;
+        
         while (true) {  // loop to find better predictor subset via sequential replacement
             for (int index=0; index<currSubsetSize; index++) {
                 if (index != lastBestErrVarPosIndex) {
@@ -697,10 +696,18 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                     if (currPredSubsets == null) {
                         subsetMSEs[index] = Double.MAX_VALUE;
                         allPredSubsets.add(new ArrayList<>());
+                        sweepCPM(currCPM, predInd2CPMInd[removedSubInd], false); // redo predictor
                     } else {
                         subsetMSEs[index] = currCPM[lastCPMIndex][lastCPMIndex];
                         validSubset.add(removedSubInd);
                         allPredSubsets.add(currPredSubsets);
+                        if (subsetMSEs[index] < minMSE) {
+                            currSubsetIndices = new ArrayList<>(currPredSubsets);
+                            minMSE = subsetMSEs[index];
+                        } else {    // undo the sweep by the chosen new predictor
+                            sweepCPM(currCPM, predInd2CPMInd[currPredSubsets.get(index)], false);
+                            sweepCPM(currCPM, predInd2CPMInd[removedSubInd], false);
+                        }
                     }
                     msePredPosIndex[index] = index;
                 }
