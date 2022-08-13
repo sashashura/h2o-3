@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
 
 import static hex.glm.GLMModel.GLMParameters.Family.gaussian;
 import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.maxr;
-import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.maxrsweep2;
+import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.maxrsweepsmall;
 import static hex.modelselection.ModelSelectionUtils.*;
 import static hex.modelselection.ModelSelectionUtils.mapPredIndex2CPMIndices;
 import static org.junit.Assert.assertArrayEquals;
@@ -448,7 +448,7 @@ public class ModelSelectionMaxRSweep2Tests extends TestUtil {
             parms._family = gaussian;
             parms._max_predictor_number = 1;
             parms._train = origF._key;
-            parms._mode = maxrsweep2;
+            parms._mode = maxrsweepsmall;
             ModelSelection model = new ModelSelection(parms);
             ModelSelectionModel model1 = model.trainModel().get();
             Scope.track_generic(model1);
@@ -648,7 +648,7 @@ public class ModelSelectionMaxRSweep2Tests extends TestUtil {
             parms._family = gaussian;
             parms._max_predictor_number = 5;
             parms._train = origF._key;
-            parms._mode = maxrsweep2;
+            parms._mode = maxrsweepsmall;
             ModelSelectionModel modelMaxRSweep = new hex.modelselection.ModelSelection(parms).trainModel().get();
             Frame resultFrameSweep = modelMaxRSweep.result();
             Scope.track(resultFrameSweep);
@@ -681,7 +681,7 @@ public class ModelSelectionMaxRSweep2Tests extends TestUtil {
             parms._family = gaussian;
             parms._max_predictor_number = 5;
             parms._train = origF._key;
-            parms._mode = maxrsweep2;
+            parms._mode = maxrsweepsmall;
             ModelSelectionModel modelMaxRSweep = new hex.modelselection.ModelSelection(parms).trainModel().get();
             Frame resultFrameSweep = modelMaxRSweep.result();
             Scope.track(resultFrameSweep);

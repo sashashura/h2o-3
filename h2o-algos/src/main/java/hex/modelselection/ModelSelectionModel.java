@@ -81,12 +81,14 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
         public double _obj_reg = -1.0;
         public double[] _lambda = new double[]{0.0};
         public boolean _use_all_factor_levels = false;
+        public int _max_predictor_subset = 65;  // for maxrsweep mode only, 
         
         public enum Mode {
             allsubsets, // use combinatorial, exponential runtime
             maxr, // use sequential replacement but calls GLM to build all models
-            maxrsweep, // use with big array
-            maxrsweep2, // use sequential replacement but use sweep to generate GLM coefficients
+            maxrsweep, // use both the maxrsweepsmall and maxrsweepfull
+            maxrsweepfull, // use with big array
+            maxrsweepsmall, // use sequential replacement but use sweep to generate GLM coefficients
             backward // use backward selection
         }
         @Override

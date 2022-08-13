@@ -9,7 +9,6 @@ import water.HeartBeat;
 import water.Key;
 import water.exceptions.H2OModelBuilderIllegalArgumentException;
 import water.fvec.Frame;
-import water.util.ArrayUtils;
 import water.util.PrettyPrint;
 
 import java.lang.reflect.Field;
@@ -85,10 +84,12 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
     public void init(boolean expensive) {
         if (_parms._nfolds > 0 || _parms._fold_column != null) {    // cv enabled
             if (backward.equals(_parms._mode)) {
-                error("nfolds/fold_column", "cross-validation is not supported for backward selection.");
-            } else if (maxrsweep2.equals(_parms._mode) || maxrsweep.equals(_parms._mode)) {
-                error("nfolds/fold_column", "cross-validation is not supported for maxrsweep or" +
-                        " maxrsweep2.");
+                error("nfolds/fold_column", "cross-validation is not supported for backward " +
+                        "selection.");
+            } else if (maxrsweepsmall.equals(_parms._mode) || maxrsweepfull.equals(_parms._mode) || 
+                    maxrsweep.equals(_parms._mode)) {
+                error("nfolds/fold_column", "cross-validation is not supported for maxrsweep, " +
+                        " maxrsweepsmall and maxrsweepfull.");
             } else {
                 _glmNFolds = _parms._nfolds;
                 if (_parms._fold_assignment != null) {
@@ -124,11 +125,14 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
         _predictorNames = extractPredictorNames(_parms, _dinfo, _foldColumn);
         _numPredictors = _predictorNames.length;
 
-        if (maxr.equals(_parms._mode) || allsubsets.equals(_parms._mode) || maxrsweep2.equals(_parms._mode) || maxrsweep.equals(_parms._mode)) { // check for maxr and allsubsets
-            if (_parms._lambda == null && !_parms._lambda_search && _parms._alpha == null && !maxrsweep2.equals(_parms._mode))
+        if (maxr.equals(_parms._mode) || allsubsets.equals(_parms._mode) || maxrsweepsmall.equals(_parms._mode) 
+                || maxrsweepfull.equals(_parms._mode) || maxrsweep.equals(_parms._mode)) { // check for maxr and allsubsets
+            if (_parms._lambda == null && !_parms._lambda_search && _parms._alpha == null && 
+                    !maxrsweepsmall.equals(_parms._mode) && !maxrsweepfull.equals(_parms._mode) && !maxrsweep.equals(_parms._mode))
                 _parms._lambda = new double[]{0.0}; // disable regularization if not specified
             if (nclasses() > 1)
-                error("response", "'allsubsets', 'maxr', 'maxrsweep', maxrsweep2' only works with regression.");
+                error("response", "'allsubsets', 'maxr', 'maxrsweep', maxrsweepfull', " +
+                        "'maxrsweepsmall' only works with regression.");
             
             if (!(AUTO.equals(_parms._family) || gaussian.equals(_parms._family)))
                 error("_family", "ModelSelection only supports Gaussian family for 'allsubset' and 'maxr' mode.");
@@ -169,13 +173,14 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
         if (_parms._nparallelism == 0)
             _parms._nparallelism = H2O.NUMCPUS;
         
-        if (maxrsweep2.equals(_parms._mode) || maxrsweep.equals(_parms._mode))
-            warn("validation_frame", " is not used in choosing the best k subset for GLM models.");
+        if (maxrsweepsmall.equals(_parms._mode) || maxrsweepfull.equals(_parms._mode) || maxrsweep.equals(_parms._mode))
+            warn("validation_frame", " is not used in choosing the best k subset for ModelSelection" +
+                    " modelss with maxrsweep, maxrsweepsmall, maxrsweepfull.");
     }
 
     protected void checkMemoryFootPrint(DataInfo activeData) {
         int p = activeData.fullN() + 1;
-        if (maxrsweep2.equals(_parms._mode))
+        if (maxrsweepsmall.equals(_parms._mode))
             p = _parms._max_predictor_number+1;
         HeartBeat hb = H2O.SELF._heartbeat;
         long mem_usage = (long) (hb._cpus_allowed * (p * p * p));
@@ -202,7 +207,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                     model._output._z_values = new double[_numPredictors][];
                     model._output._best_model_predictors = new String[_numPredictors][];
                     model._output._coefficient_names = new String[_numPredictors][];
-                } else {    // maxr
+                } else {    // maxr, maxrsweep, marxsweepfull, maxrsweepsmall
                     model._output._best_model_ids = new Key[_parms._max_predictor_number];
                     model._output._best_r2_values = new double[_parms._max_predictor_number];
                     model._output._best_model_predictors = new String[_parms._max_predictor_number][];
@@ -215,10 +220,12 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                     buildMaxRModels(model);
                 else if (backward.equals(_parms._mode))
                     numModelBuilt = buildBackwardModels(model);
+                else if (maxrsweepfull.equals(_parms._mode))
+                    buildMaxRSweepFullModels(model, 1, _parms._max_predictor_number, null);
+                else if (maxrsweepsmall.equals(_parms._mode))
+                    buildMaxRSweepSmallModels(model, _parms._max_predictor_number);
                 else if (maxrsweep.equals(_parms._mode))
                     buildMaxRSweepModels(model);
-                else if (maxrsweep2.equals(_parms._mode))
-                    buildMaxRSweep2Models(model);
                 _job.update(0, "Completed GLM model building.  Extracting results now.");
                 model.update(_job);
                 // copy best R2 and best predictors to model._output
@@ -235,17 +242,32 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
         }
 
         /***
+         * The maxrsweep mode will do the following:
+         * 1. if the _max_predictor_number is small, maxrSweepSmall will be called to build the models;
+         * 2. if the _max_predictor_number > _parms._max_predict_subset, maxrSweepSmall will be called to build the 
+         * models with small predictor subsets for higher speed than using maxrsweepfull. For predictor subset 
+         * size > _parms._max_predict_subset, the rest of the bigger predictor subsets models will be built by
+         * maxrsweepfull as it runs faster with large predictor subsets.
+         */
+        void buildMaxRSweepModels(ModelSelectionModel model) {
+            if (_parms._max_predictor_number > _parms._max_predictor_subset) {
+                List<Integer> currSubsetIndices = buildMaxRSweepSmallModels(model, _parms._max_predictor_subset);
+                buildMaxRSweepFullModels(model, _parms._max_predictor_subset+1, 
+                        _parms._max_predictor_number, currSubsetIndices);
+            } else {
+                buildMaxRSweepSmallModels(model, _parms._max_predictor_number);
+            }
+        }
+        /***
          * 
          * The maxrsweep mode implementation can be explained in the maxrsweep.pdf doc stored here:
          * https://h2oai.atlassian.net/browse/PUBDEV-8703 .  Apart from actions specific to sweep implementation, the
          * logic in this function is very similar to that of maxr mode.
          * 
          */
-        void buildMaxRSweepModels(ModelSelectionModel model) {
+        void buildMaxRSweepFullModels(ModelSelectionModel model, int modelIndexStart, int numModels2Build, List<Integer> currSubsetIndices) {
             checkMemoryFootPrint(_dinfo);
             _coefNames = _dinfo.coefNames();
-            List<Integer> currSubsetIndices = new ArrayList<>();    // store best k predictor subsets for 1 to k predictors
-            List<Integer> currSubsetIndicesRep;
             List<String> coefNames = new ArrayList<>(Arrays.asList(_predictorNames));
             // store predictor indices that are still available to be added to the bigger subset
             List<Integer> validSubset = IntStream.rangeClosed(0, coefNames.size() - 1).boxed().collect(Collectors.toList());
@@ -255,8 +277,14 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
             double[][] crossProdcutMatrix = createCrossProductMatrix(_job._key, _dinfo);
             if (_parms._intercept)  // sweep the intercept now
                 sweepCPM(crossProdcutMatrix, new int[]{crossProdcutMatrix.length-2}, false);
+            if (modelIndexStart > 1) {    // perform model sweep before continue
+                for (int x : currSubsetIndices)
+                    sweepCPM(crossProdcutMatrix, _predictorIndex2CPMIndices[currSubsetIndices.get(x)], false);
+            } else {
+                currSubsetIndices = new ArrayList<>();    // store best k predictor subsets for 1 to k predictors
+            }
             
-            for (int predNum = 1; predNum <= _parms._max_predictor_number; predNum++) { // find best predictor subset for each subset size
+            for (int predNum = modelIndexStart; predNum <= numModels2Build; predNum++) { // find best predictor subset for each subset size
                 Set<BitSet> usedCombos = new HashSet<>();
                 currSubsetIndices = forwardStep(currSubsetIndices, coefNames, validSubset, usedCombos, crossProdcutMatrix,
                         _predictorIndex2CPMIndices, currSubsetIndices.size());
@@ -285,7 +313,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
          * logic in this function is very similar to that of maxr mode.
          *
          */
-        void buildMaxRSweep2Models(ModelSelectionModel model) {
+        List<Integer> buildMaxRSweepSmallModels(ModelSelectionModel model, int numModels2Build) {
             checkMemoryFootPrint(_dinfo);
             _coefNames = _dinfo.coefNames();
             // generate cross-product matrix (CPM) as in section III of doc
@@ -298,7 +326,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
             List<Integer> validSubset = IntStream.rangeClosed(0, coefNames.size() - 1).boxed().collect(Collectors.toList());
             SweepModel bestModel = null;
 
-            for (int predNum = 1; predNum <= _parms._max_predictor_number; predNum++) { // find best predictor subset for each subset size
+            for (int predNum = 1; predNum <= numModels2Build; predNum++) { // find best predictor subset for each subset size
                 Set<BitSet> usedCombos = new HashSet<>();
                 if (bestModel == null) {
                     bestModel = forwardStep(currSubsetIndices, coefNames, validSubset,
@@ -322,6 +350,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
                 DKV.put(bestR2Model);
                 model._output.updateBestModels(bestR2Model, predNum-1);
             }
+            return currSubsetIndices;
         }
         
         public GLMModel buildGLMModel(List<Integer> bestSubsetIndices) {
