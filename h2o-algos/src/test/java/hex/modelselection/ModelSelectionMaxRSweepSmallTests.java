@@ -26,7 +26,7 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(H2ORunner.class)
 @CloudSize(1)
-public class ModelSelectionMaxRSweep2Tests extends TestUtil {
+public class ModelSelectionMaxRSweepSmallTests extends TestUtil {
 
     @Test
     public void testAllSweepingVectors() {
