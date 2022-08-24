@@ -3,6 +3,7 @@ package water;
 import jsr166y.CountedCompleter;
 import jsr166y.ForkJoinPool;
 import water.fvec.*;
+import water.rapids.ast.prims.models.AstFairnessMetrics;
 import water.util.DistributedException;
 import water.util.FrameUtils;
 import water.util.PrettyPrint;
